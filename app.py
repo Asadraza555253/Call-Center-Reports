@@ -9,9 +9,9 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 try:
-from openai import OpenAI
-except Exception:
-OpenAI = None
+    from openai import OpenAI
+except:
+    pass
 
 st.set_page_config(page_title="CX AI Reporting Agent", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 

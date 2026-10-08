@@ -177,11 +177,20 @@ def read_tickets_table(upload):
         tickets_total=('tickets_total', 'sum'))
     return out
 
+def force_counter_night(df):
+    """Counter Staff always belong to the Night shift, regardless of login time
+    or manual assignment."""
+    if df is None or df.empty or 'agent_name' not in df: return df
+    d=df.copy()
+    mask=d['agent_name'].astype(str).str.strip().str.lower().eq('counter staff')
+    d.loc[mask,'shift']='Night'
+    return d
+
 def sort_agents(df):
     """Order agents by shift (Morning, Evening, Night, Unknown), then largest to smallest
     by calls, then by tickets total (ties broken by name for a stable order)."""
     if df is None or df.empty: return df
-    d=df.copy()
+    d=force_counter_night(df)
     order={x:i for i,x in enumerate(['Morning','Evening','Night','Unknown'])}
     d['_so']=d['shift'].fillna('Unknown').map(order).fillna(3)
     d['_c']=pd.to_numeric(d['calls'],errors='coerce').fillna(0)
@@ -227,6 +236,7 @@ def apply_aliases(key, alias_map):
     return alias_map.get(key, key)
 
 def compute_shift_summary(m):
+    m=force_counter_night(m)
     if len(m):
         shift=m.groupby('shift',dropna=False).agg(agents=('agent_name','count'),calls=('calls','sum'),tickets_total=('tickets_total','sum'),avg_aht_sec=('aht_sec','mean')).reset_index()
         shift['avg_aht']=shift.avg_aht_sec.map(hms)
@@ -599,7 +609,7 @@ if qfile and afile:
             'report, IVR report and Shift Summary. Evening duty starts at **2:00 PM** by default.'
         )
         shift_key = 'shift_assignment_editor'
-        base = r['agents'][['agent_name','shift']].copy()
+        base = force_counter_night(r['agents'])[['agent_name','shift']].copy()
         base.columns = ['Agent', 'Shift']
         edited = st.data_editor(
             base,
@@ -618,6 +628,7 @@ if qfile and afile:
         )
         overrides = dict(zip(edited['Agent'].astype(str), edited['Shift'].astype(str)))
         r['agents']['shift'] = r['agents']['agent_name'].map(overrides).fillna(r['agents']['shift'])
+        r['agents'] = force_counter_night(r['agents'])
         r['agents'] = sort_agents(r['agents'])
         r['shift'] = compute_shift_summary(r['agents'])
 

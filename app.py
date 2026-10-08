@@ -189,7 +189,7 @@ def sort_agents(df):
     d=d.sort_values(['_so','_c','_t','agent_name'],ascending=[True,False,False,True],kind='mergesort')
     return d.drop(columns=['_so','_c','_t']).reset_index(drop=True)
 
-def shift_from_login(x, m_start=6, e_start=15, n_start=2):
+def shift_from_login(x, m_start=6, e_start=14, n_start=2):
     """Classify an agent's shift from their login hour, using three
     configurable start-hours (0-23). Handles wraparound past midnight
     automatically regardless of which shift wraps."""
@@ -262,7 +262,7 @@ def build_report(queue, summary, cfg, tickets=None):
         a['login_sec']=a.loginTime.map(parse_hms); a['break_sec']=a.breakTime.map(parse_hms)
         a['active_sec']=(a.login_sec-a.break_sec).clip(lower=0)
         a['login']=a.login_sec.map(hms); a['break']=a.break_sec.map(hms); a['active']=a.active_sec.map(hms)
-        a['shift']=a.login_dt.map(lambda x: shift_from_login(x, cfg.get('morning_start',6), cfg.get('evening_start',15), cfg.get('night_start',2)))
+        a['shift']=a.login_dt.map(lambda x: shift_from_login(x, cfg.get('morning_start',6), cfg.get('evening_start',14), cfg.get('night_start',2)))
         a=a.drop_duplicates('agentName')
     else: a=pd.DataFrame(columns=['agentName','shift','login','break','active'])
 
@@ -561,10 +561,10 @@ with st.sidebar:
     cfg={'aht':st.number_input('AHT target (seconds)',30,600,DEFAULTS['aht']), 'within1':st.number_input('Within 1 minute target (%)',50,100,DEFAULTS['within1']), 'within2':st.number_input('Within 2 minutes target (%)',50,100,DEFAULTS['within2']), 'abandon':st.number_input('Abandon target (%)',0.0,20.0,float(DEFAULTS['abandon'])), 'exclude':[x.strip() for x in st.text_input('Exclude from KPI denominator','Counter Staff').split(',') if x.strip()]}; meta={'total_agents':st.number_input('Total agents',1,200,17), 'present':st.number_input('Present',0,200,12), 'leave':st.number_input('Leave',0,200,2), 'rest':st.number_input('Rest',0,200,2), 'absent':st.number_input('Absent',0,200,1), 'within1_target':98, 'within2_target':98, 'abandon_target':2}
     st.divider(); st.caption('IVR hangups are always kept separate from actual abandoned calls.')
     st.divider()
-    st.caption('Automatic shift suggestion only — you can manually assign every agent below. Evening duty starts at 3:00 PM by default; manual assignment always overrides login-time grouping.')
+    st.caption('Automatic shift suggestion only — you can manually assign every agent below. Evening duty starts at 2:00 PM by default; manual assignment always overrides login-time grouping.')
     sc1,sc2,sc3=st.columns(3)
     cfg['morning_start']=sc1.number_input('Morning starts',0,23,6)
-    cfg['evening_start']=sc2.number_input('Evening starts',0,23,15)
+    cfg['evening_start']=sc2.number_input('Evening starts',0,23,14)
     cfg['night_start']=sc3.number_input('Night starts',0,23,2)
     st.divider()
     st.caption('Name aliases: same agent spelled differently across files. Built-in: Faisal Mehmood/Mahmood, M Hassan/Muhammad Hasaan.')
@@ -596,7 +596,7 @@ if qfile and afile:
         st.caption(
             'Select the actual duty shift for each agent. Manual assignments override the '
             'automatic login-time grouping and are used in the Daily Dashboard, Call Handling '
-            'report, IVR report and Shift Summary. Evening duty starts at **3:00 PM** by default.'
+            'report, IVR report and Shift Summary. Evening duty starts at **2:00 PM** by default.'
         )
         shift_key = 'shift_assignment_editor'
         base = r['agents'][['agent_name','shift']].copy()

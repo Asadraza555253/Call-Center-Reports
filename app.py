@@ -177,6 +177,18 @@ def read_tickets_table(upload):
         tickets_total=('tickets_total', 'sum'))
     return out
 
+def sort_agents(df):
+    """Order agents by shift (Morning, Evening, Night, Unknown), then largest to smallest
+    by calls, then by tickets total (ties broken by name for a stable order)."""
+    if df is None or df.empty: return df
+    d=df.copy()
+    order={x:i for i,x in enumerate(['Morning','Evening','Night','Unknown'])}
+    d['_so']=d['shift'].fillna('Unknown').map(order).fillna(3)
+    d['_c']=pd.to_numeric(d['calls'],errors='coerce').fillna(0)
+    d['_t']=pd.to_numeric(d['tickets_total'],errors='coerce').fillna(0) if 'tickets_total' in d else 0
+    d=d.sort_values(['_so','_c','_t','agent_name'],ascending=[True,False,False,True],kind='mergesort')
+    return d.drop(columns=['_so','_c','_t']).reset_index(drop=True)
+
 def shift_from_login(x, m_start=6, e_start=15, n_start=2):
     """Classify an agent's shift from their login hour, using three
     configurable start-hours (0-23). Handles wraparound past midnight
@@ -378,7 +390,7 @@ def export_dashboard_excel(r, meta=None):
     for (c1,c2),lab,val in zip(spans,labels,vals):
         _merge(ws,2,c1,c2,lab,navy,Font(bold=True,color=white),border=border)
         _merge(ws,3,c1,c2,val,'FFFFFF',Font(bold=True,size=12),border=border)
-    agents=r['agents'].copy(); order=['Morning','Evening','Night','Unknown']
+    agents=sort_agents(r['agents']); order=['Morning','Evening','Night','Unknown']
     present_shifts=[s for s in order if not agents[agents['shift'].fillna('Unknown').eq(s)].empty]
     first_shift=present_shifts[0] if present_shifts else None
     agent_header='Agent\n'+first_shift if first_shift else 'Agent'
@@ -430,7 +442,7 @@ def export_call_handling_excel(r, meta=None):
     _cell(ws,1,12,'Date',fill=peach,font=Font(bold=True),border=border); _cell(ws,1,13,r['date'],fill=peach,font=Font(bold=True),border=border); _cell(ws,1,14,'',fill=peach,border=border)
     headers=['Sr#','Agent Name','UAN','0 - 1 min','%','1.1- 2 Min','%','2.1- 3 Min','%','Above 3 min','%','Call Cutting','Total','Receiving Age%']
     _style_headers(ws,2,headers,blue,border); ws.row_dimensions[2].height=32
-    row=3; agents=r['agents'].copy(); order=['Morning','Evening','Night','Unknown']; sr=1
+    row=3; agents=sort_agents(r['agents']); order=['Morning','Evening','Night','Unknown']; sr=1
     for shift in order:
         g=agents[agents['shift'].fillna('Unknown').eq(shift)]
         if g.empty: continue
@@ -606,6 +618,7 @@ if qfile and afile:
         )
         overrides = dict(zip(edited['Agent'].astype(str), edited['Shift'].astype(str)))
         r['agents']['shift'] = r['agents']['agent_name'].map(overrides).fillna(r['agents']['shift'])
+        r['agents'] = sort_agents(r['agents'])
         r['shift'] = compute_shift_summary(r['agents'])
 
         # Clear visual confirmation of the configured shift rules.
